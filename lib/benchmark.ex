@@ -78,13 +78,13 @@ defmodule Benchmark do
 
   defmacro times(n, do: block) do
     quote do
-      unless is_integer(unquote(n)) and unquote(n) > 1 do
-        raise ArgumentError, message: "the number of times must be greater than 1"
+      unless is_integer(unquote(n)) and unquote(n) > 0 do
+        raise ArgumentError, message: "the number of times must be greater than 0"
       end
 
       func         = fn -> unquote(block) end
-      { first, _ } = Benchmark.run(func)
-      result       = Enum.reduce 1 .. unquote(n), { first, first, 0 }, fn
+      # for any integer x, x < nil.
+      result       = Enum.reduce 1 .. unquote(n), { nil, -1, 0 }, fn
         _, { min, max, total } ->
           { current, _ } = Benchmark.run(func)
 
