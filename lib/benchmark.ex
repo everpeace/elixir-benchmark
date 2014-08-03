@@ -84,21 +84,22 @@ defmodule Benchmark do
 
       func         = fn -> unquote(block) end
       # for any integer x, x < nil.
-      result       = Enum.reduce 1 .. unquote(n), { nil, -1, 0 }, fn
-        _, { min, max, total } ->
-          { current, _ } = Benchmark.run(func)
+      result       = Enum.reduce 1 .. unquote(n), { nil, -1, 0, [] }, fn
+        i, { min, max, total, tests } ->
+          { current, res } = Benchmark.run(func)
 
-          { min(min, current), max(max, current), total + current }
+          { min(min, current), max(max, current), total + current, [{current, res} | tests] }
       end
 
-      { min, max, total } = result
+      { min, max, total, tests } = result
 
       [ min: Benchmark.Time.at(min),
         max: Benchmark.Time.at(max),
 
         average: Benchmark.Time.at(total / unquote(n)),
         total:   Benchmark.Time.at(total),
-        length:  unquote(n) ]
+        length:  unquote(n),
+        results: :lists.reverse(:lists.map(fn {time,res} -> {Time.at(time), res} end, tests))]
     end
   end
 
@@ -130,18 +131,19 @@ defmodule Benchmark do
 
       func  = fn -> unquote(block) end
       tests = Benchmark.run_for_executor(unquote(d), func)
-        |> Enum.sort(fn { a, _ }, { b, _ } -> b > a end)
+      sorted = tests |> Enum.sort(fn { a, _ }, { b, _ } -> b > a end)
 
-      total = Enum.reduce(tests, 0, fn({ t, _ }, sum) -> t + sum end)
+      total = Enum.reduce(sorted, 0, fn({ t, _ }, sum) -> t + sum end)
 
-      [ min: Benchmark.Time.at(elem(List.first(tests), 0)),
-        max: Benchmark.Time.at(elem(List.last(tests), 0)),
+      [ min: Benchmark.Time.at(elem(List.first(sorted), 0)),
+        max: Benchmark.Time.at(elem(List.last(sorted), 0)),
 
-        median: Benchmark.Time.at(elem(Enum.at(tests, round(length(tests) / 2)), 0)),
-        average: Benchmark.Time.at(total / length(tests)),
+        median: Benchmark.Time.at(elem(Enum.at(sorted, round(length(tests) / 2)), 0)),
+        average: Benchmark.Time.at(total / length(sorted)),
         total: Benchmark.Time.at(total),
-        number: length(tests),
-        requested_duration: Benchmark.Time.at(unquote(d)) ]
+        number: length(sorted),
+        requested_duration: Benchmark.Time.at(unquote(d)),
+        results: :lists.reverse(:lists.map(fn {time, res} -> {Time.at(time), res} end, tests)) ]
     end
   end
 
@@ -151,9 +153,9 @@ defmodule Benchmark do
         tests
 
       true ->
-        result = Benchmark.run(func)
+        {time, res} = Benchmark.run(func)
 
-        run_for_executor(d, func, total + elem(result, 0), [result | tests])
+        run_for_executor(d, func, total + time, [{time, res} | tests])
     end
   end
 
